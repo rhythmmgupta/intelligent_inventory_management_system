@@ -1,0 +1,26 @@
+groups:
+  - name: freshguard_operational_alerts
+    rules:
+      - alert: FreshGuardServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FreshGuard service {{ $labels.job }} is unreachable"
+
+      - alert: FreshGuardHighApiLatency
+        expr: histogram_quantile(0.95, sum(rate(freshguard_http_request_duration_seconds_bucket[5m])) by (le)) > 1.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend API p95 latency exceeded 1 second"
+
+      - alert: FreshGuardMlFallbackSpike
+        expr: increase(freshguard_ml_fallback_total[10m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend is falling back to moving-average rules due to ML service issues"

@@ -1,0 +1,15 @@
+title = "FreshGuard Secret Scanning Policy"
+
+[allowlist]
+description = "Ignore documented placeholder templates and local non-prod compose defaults"
+paths = [
+  '''.env.example''',
+  '''docker-compose.yml''',
+  '''README.md''',
+]
+regexes = [
+  '''CHANGE_ME_.*''',
+  '''FreshGuardLocalDevJwtSecret2026!''',
+  '''FreshGuardDemo2026!''',
+  '''TestPassword123!''',
+]

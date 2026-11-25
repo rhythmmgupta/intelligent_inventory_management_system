@@ -1,0 +1,96 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: freshguard-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: freshguard-ml
+    restart: unless-stopped
+    volumes:
+      - ml_artifacts:/app/artifacts
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: freshguard-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/freshguard_inventory
+      ML_SERVICE_URL: http://ml-service:8000
+      JWT_SECRET: ${JWT_SECRET:-FreshGuardLocalDevJwtSecret2026!}
+      ALLOWED_ORIGIN: http://localhost,http://localhost:80,http://localhost:5173
+      SEED_ON_EMPTY: "true"
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-FreshGuardDemo2026!}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+    networks:
+      - app_internal
+    ports:
+      - "5001:5000"
+
+  db-init:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: freshguard-db-init
+    restart: "no"
+    command: ["node", "src/scripts/initDb.js"]
+    environment:
+      NODE_ENV: development
+      MONGO_URI: mongodb://mongodb:27017/freshguard_inventory
+      SEED_ON_EMPTY: "true"
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-FreshGuardDemo2026!}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app_internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: freshguard-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - app_internal
+    ports:
+      - "80:8080"
+
+volumes:
+  mongo_data:
+  ml_artifacts:
+
+networks:
+  app_internal:
+    driver: bridge

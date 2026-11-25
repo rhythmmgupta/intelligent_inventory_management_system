@@ -1,0 +1,89 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: freshguard-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ml-service:
+    image: ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
+    container_name: freshguard-ml
+    restart: unless-stopped
+    volumes:
+      - ml_artifacts:/app/artifacts
+    networks:
+      - app_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    image: ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
+    container_name: freshguard-backend
+    restart: unless-stopped
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/freshguard_inventory
+      ML_SERVICE_URL: http://ml-service:8000
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+    networks:
+      - app_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  frontend:
+    image: ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+    container_name: freshguard-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - app_internal
+    ports:
+      - "80:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  mongo_data:
+  ml_artifacts:
+
+networks:
+  app_internal:
+    driver: bridge
