@@ -134,7 +134,7 @@ pipeline {
         }
 
         stage('7. Code-Quality Analysis (SonarQube)') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression { false } }
             steps {
                 withSonarQubeEnv('SonarQubeServer') {
                     sh '''
@@ -154,7 +154,7 @@ pipeline {
         }
 
         stage('8. Dependency Vulnerability Scanning') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression { false } }
             steps {
                 sh '''
                     cd backend && npm audit --omit=dev --audit-level=critical
@@ -176,7 +176,7 @@ pipeline {
         }
 
         stage('9. Docker Image Building') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression { false } }
             steps {
                 sh '''
                     docker build -t ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG} ./backend
@@ -187,7 +187,7 @@ pipeline {
         }
 
         stage('10. Docker Image Vulnerability Scanning (Trivy)') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {false } }
             steps {
                 sh '''
                     mkdir -p trivy-reports
@@ -210,7 +210,7 @@ pipeline {
         }
 
         stage('11. Quality and Security Gates') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {  false } }
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -230,7 +230,7 @@ pipeline {
         }
 
         stage('12. Push Approved Images to Registry') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {  false } }
             steps {
                 sh '''
                     echo "${DOCKER_CREDS_PSW}" | docker login -u "${DOCKER_CREDS_USR}" --password-stdin
@@ -243,7 +243,7 @@ pipeline {
         }
 
         stage('13. Deploy to AWS EC2') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {  false } }
             steps {
                 script {
                     env.DEPLOY_STARTED = 'true'
@@ -262,7 +262,7 @@ pipeline {
         }
 
         stage('14. Database Initialization & Index Checks') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {  false } }
             steps {
                 sshagent(credentials: ['freshguard-ec2-ssh-key']) {
                     sh '''
@@ -274,14 +274,14 @@ pipeline {
         }
 
         stage('15. Smoke Tests & Health Checks') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression {  false } }
             steps {
                 sh './scripts/smoke-test.sh "http://${EC2_HOST}"'
             }
         }
 
         stage('16. Monitor Deployment') {
-            when { expression { return params.MANUAL_ROLLBACK == false } }
+            when { expression { false } }
             steps {
                 sshagent(credentials: ['freshguard-ec2-ssh-key']) {
                     sh '''
