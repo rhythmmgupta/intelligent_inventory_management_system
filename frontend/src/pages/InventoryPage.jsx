@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { BatchStatusBadge, StockStatusBadges } from '../components/StatusBadges';
+import { formatINR } from '../utils/currency';
 
 const INITIAL_BATCH_FORM = {
   mode: 'new',
@@ -18,8 +19,8 @@ const INITIAL_BATCH_FORM = {
   purchaseDate: new Date().toISOString().slice(0, 10),
   expiryDate: new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
   supplier: '',
-  costPrice: 1.5,
-  sellingPrice: 3.0,
+  costPrice: 45,
+  sellingPrice: 70,
   storeLocation: 'Aisle 1',
 };
 
@@ -309,7 +310,7 @@ export default function InventoryPage() {
                         <td>
                           <strong>{item.name}</strong>
                           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                            {item.sku} · {item.storeLocation} · ${item.sellingPrice.toFixed(2)}/{item.unit}
+                            {item.sku} · {item.storeLocation} · {formatINR(item.sellingPrice)}/{item.unit}
                           </div>
                         </td>
                         <td>
@@ -379,7 +380,7 @@ export default function InventoryPage() {
                                       {b.remainingQuantity} / {b.initialQuantity} {item.unit}
                                     </td>
                                     <td>
-                                      ${b.costPrice} / ${b.sellingPrice}
+                                      {formatINR(b.costPrice)} / {formatINR(b.sellingPrice)}
                                     </td>
                                     <td>{b.storeLocation}</td>
                                     <td>
@@ -613,7 +614,7 @@ export default function InventoryPage() {
                   />
                 </div>
                 <div className="form-field">
-                  <label>Cost Price ($)</label>
+                  <label>Cost Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -624,7 +625,7 @@ export default function InventoryPage() {
                   />
                 </div>
                 <div className="form-field">
-                  <label>Selling Price ($)</label>
+                  <label>Selling Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -721,7 +722,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div className="form-field" style={{ marginBottom: 10 }}>
-                <label>Selling Price ($)</label>
+                <label>Selling Price (₹)</label>
                 <input
                   type="number"
                   step="0.01"

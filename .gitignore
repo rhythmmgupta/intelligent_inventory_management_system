@@ -9,6 +9,8 @@ coverage/
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
+ml-service/.coverage
 ml-service/artifacts/*.joblib
 .scannerwork/
 dependency-check-report/

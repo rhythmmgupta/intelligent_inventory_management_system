@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ShoppingCart } from 'lucide-react';
 import { apiRequest } from '../api/client';
+import { formatINR } from '../utils/currency';
 
 export default function SalesPage() {
   const [products, setProducts] = useState([]);
@@ -73,7 +74,7 @@ export default function SalesPage() {
       {error && <div className="alert alert-error">{error}</div>}
       {lastAllocation && (
         <div className="alert alert-success">
-          <strong>Sale Recorded (${lastAllocation.totalRevenue.toFixed(2)})</strong> — FEFO
+          <strong>Sale Recorded ({formatINR(lastAllocation.totalRevenue)})</strong> — FEFO
           allocated from:{' '}
           {lastAllocation.batchAllocations
             .map((a) => `${a.batchNumber} (${a.quantityDeducted} units, exp ${a.expiryDate.slice(0, 10)})`)
@@ -156,7 +157,7 @@ export default function SalesPage() {
                     <td>{s.saleDate.slice(0, 10)}</td>
                     <td>{s.productId?.name || 'Item'}</td>
                     <td>{s.quantitySold}</td>
-                    <td>${s.totalRevenue.toFixed(2)}</td>
+                    <td>{formatINR(s.totalRevenue)}</td>
                     <td style={{ fontSize: '0.78rem' }}>
                       {s.batchAllocations.length > 0
                         ? s.batchAllocations.map((a) => `${a.batchNumber}(-${a.quantityDeducted})`).join(', ')

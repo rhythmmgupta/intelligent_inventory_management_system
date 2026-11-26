@@ -25,9 +25,9 @@ pipeline {
         DOCKER_CREDS    = credentials('freshguard-registry-creds')
         EC2_HOST        = credentials('freshguard-ec2-host')
         EC2_USER        = credentials('freshguard-ec2-user')
-        APP_BASE_URL    = "http://${EC2_HOST}"
         DEPLOY_DIR      = '/opt/freshguard-inventory'
         TRIVY_SEVERITY  = 'CRITICAL'
+        DEPLOY_STARTED  = 'false'
     }
 
     stages {
@@ -63,7 +63,13 @@ pipeline {
                 sh '''
                     cd backend && npm ci
                     cd ../frontend && npm ci
-                    cd ../ml-service && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+                    cd ../ml-service
+                    if python3 -m venv .venv 2>/dev/null; then
+                        . .venv/bin/activate && pip install -r requirements.txt
+                    else
+                        echo "python3-venv unavailable on host; Stage 6 will run ML tests via python:3.11-slim Docker container."
+                        rm -rf .venv
+                    fi
                 '''
             }
         }
@@ -108,7 +114,15 @@ pipeline {
                 }
                 stage('6. ML-Service Testing') {
                     steps {
-                        sh 'cd ml-service && . .venv/bin/activate && pytest --cov=app --cov-report=xml:coverage.xml'
+                        sh '''
+                            cd ml-service
+                            if [ -x .venv/bin/pytest ]; then
+                                . .venv/bin/activate && pytest --cov=app --cov-report=xml:coverage.xml
+                            else
+                                docker run --rm -v "$PWD:/app" -w /app python:3.11-slim sh -c \
+                                  "pip install --no-cache-dir -q -r requirements.txt && pytest --cov=app --cov-report=xml:coverage.xml && chown -R $(id -u):$(id -g) /app"
+                            fi
+                        '''
                     }
                     post {
                         always {
@@ -127,8 +141,12 @@ pipeline {
                         if command -v sonar-scanner >/dev/null 2>&1; then
                             sonar-scanner -Dsonar.projectVersion=${IMAGE_TAG}
                         else
-                            echo "sonar-scanner CLI not found on agent; configure SonarQube Scanner tool."
-                            exit 1
+                            docker run --rm --network host \
+                              -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+                              -e SONAR_TOKEN="${SONAR_AUTH_TOKEN}" \
+                              -v "$PWD:/usr/src" -w /usr/src \
+                              sonarsource/sonar-scanner-cli:latest \
+                              -Dsonar.projectVersion=${IMAGE_TAG}
                         fi
                     '''
                 }
@@ -141,7 +159,12 @@ pipeline {
                 sh '''
                     cd backend && npm audit --omit=dev --audit-level=critical
                     cd ../frontend && npm audit --omit=dev --audit-level=critical
-                    cd ../ml-service && . .venv/bin/activate && (command -v pip-audit >/dev/null 2>&1 && pip-audit || echo "Install pip-audit for Python CVE checks")
+                    cd ../ml-service
+                    if [ -x .venv/bin/pip-audit ]; then
+                        . .venv/bin/activate && pip-audit
+                    else
+                        echo "pip-audit skipped (install python3-venv + pip-audit on agent for Python CVE check)"
+                    fi
                     if command -v dependency-check.sh >/dev/null 2>&1; then
                         dependency-check.sh --project FreshGuard --scan . --format HTML --format JSON \
                           --out dependency-check-report --failOnCVSS 9 --exclude "**/node_modules/**" --exclude "**/.venv/**"
@@ -168,9 +191,15 @@ pipeline {
             steps {
                 sh '''
                     mkdir -p trivy-reports
-                    trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/backend.json ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
-                    trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/ml.json ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
-                    trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/frontend.json ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    if command -v trivy >/dev/null 2>&1; then
+                        trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/backend.json ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
+                        trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/ml.json ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
+                        trivy image --ignore-unfixed --severity CRITICAL,HIGH --format json -o trivy-reports/frontend.json ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    else
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-reports:/reports" aquasec/trivy:latest image --ignore-unfixed --severity CRITICAL,HIGH --format json -o /reports/backend.json ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-reports:/reports" aquasec/trivy:latest image --ignore-unfixed --severity CRITICAL,HIGH --format json -o /reports/ml.json ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/trivy-reports:/reports" aquasec/trivy:latest image --ignore-unfixed --severity CRITICAL,HIGH --format json -o /reports/frontend.json ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    fi
                 '''
             }
             post {
@@ -187,9 +216,15 @@ pipeline {
                     waitForQualityGate abortPipeline: true
                 }
                 sh '''
-                    trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
-                    trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
-                    trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    if command -v trivy >/dev/null 2>&1; then
+                        trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
+                        trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
+                        trivy image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    else
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-backend:${IMAGE_TAG}
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-ml:${IMAGE_TAG}
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --exit-code 1 --ignore-unfixed --severity ${TRIVY_SEVERITY} ${REGISTRY_PREFIX}/freshguard-frontend:${IMAGE_TAG}
+                    fi
                 '''
             }
         }
@@ -210,8 +245,13 @@ pipeline {
         stage('13. Deploy to AWS EC2') {
             when { expression { return params.MANUAL_ROLLBACK == false } }
             steps {
+                script {
+                    env.DEPLOY_STARTED = 'true'
+                }
                 sshagent(credentials: ['freshguard-ec2-ssh-key']) {
                     sh '''
+                        ssh -o StrictHostKeyChecking=accept-new ${EC2_USER}@${EC2_HOST} \
+                          "sudo mkdir -p ${DEPLOY_DIR}/scripts && sudo chown -R ${EC2_USER}:${EC2_USER} ${DEPLOY_DIR}"
                         scp -o StrictHostKeyChecking=accept-new docker-compose.prod.yml ${EC2_USER}@${EC2_HOST}:${DEPLOY_DIR}/docker-compose.prod.yml
                         scp -o StrictHostKeyChecking=accept-new scripts/deploy.sh scripts/smoke-test.sh scripts/init-db.sh ${EC2_USER}@${EC2_HOST}:${DEPLOY_DIR}/scripts/
                         ssh -o StrictHostKeyChecking=accept-new ${EC2_USER}@${EC2_HOST} \
@@ -236,7 +276,7 @@ pipeline {
         stage('15. Smoke Tests & Health Checks') {
             when { expression { return params.MANUAL_ROLLBACK == false } }
             steps {
-                sh './scripts/smoke-test.sh "${APP_BASE_URL}"'
+                sh './scripts/smoke-test.sh "http://${EC2_HOST}"'
             }
         }
 
@@ -256,13 +296,17 @@ pipeline {
     post {
         failure {
             script {
-                if (params.MANUAL_ROLLBACK == false && env.IMAGE_TAG) {
-                    echo '17. Automated Rollback triggered due to pipeline/deployment failure!'
-                    sshagent(credentials: ['freshguard-ec2-ssh-key']) {
-                        sh '''
-                            ssh -o StrictHostKeyChecking=accept-new ${EC2_USER}@${EC2_HOST} \
-                              "cd ${DEPLOY_DIR} && ./scripts/deploy.sh --rollback" || true
-                        '''
+                if (params.MANUAL_ROLLBACK == false && env.DEPLOY_STARTED == 'true') {
+                    echo '17. Automated Rollback triggered due to deployment failure!'
+                    try {
+                        sshagent(credentials: ['freshguard-ec2-ssh-key']) {
+                            sh '''
+                                ssh -o StrictHostKeyChecking=accept-new ${EC2_USER}@${EC2_HOST} \
+                                  "cd ${DEPLOY_DIR} && ./scripts/deploy.sh --rollback" || true
+                            '''
+                        }
+                    } catch (err) {
+                        echo "Automated rollback skipped or failed: ${err.message}"
                     }
                 }
             }

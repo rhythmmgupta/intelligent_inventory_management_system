@@ -44,6 +44,7 @@ services:
       ML_SERVICE_URL: http://ml-service:8000
       JWT_SECRET: ${JWT_SECRET:-FreshGuardLocalDevJwtSecret2026!}
       ALLOWED_ORIGIN: http://localhost,http://localhost:80,http://localhost:5173
+      STORE_TZ_OFFSET_MINUTES: 330
       SEED_ON_EMPTY: "true"
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:-FreshGuardDemo2026!}
     depends_on:

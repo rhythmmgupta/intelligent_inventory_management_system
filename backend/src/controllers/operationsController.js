@@ -309,7 +309,10 @@ async function getDashboardSummary(req, res, next) {
     const [predictions, wasteAnalytics, recentActivity, latestModelRun] = await Promise.all([
       predictForProducts(allItems, storeConfig),
       getWasteAnalytics({ periodDays: 30 }),
-      AuditLog.find().sort({ timestamp: -1 }).limit(12).lean(),
+      AuditLog.find({ action: { $nin: ['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGOUT'] } })
+        .sort({ timestamp: -1 })
+        .limit(12)
+        .lean(),
       MlModelRun.findOne({ isActiveModel: true }).sort({ trainedAt: -1 }).lean(),
     ]);
 

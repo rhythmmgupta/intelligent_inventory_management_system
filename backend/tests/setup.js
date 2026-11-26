@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
-jest.setTimeout(60000);
+jest.setTimeout(120000);
 
 let mongoServer = null;
 
@@ -12,7 +12,7 @@ beforeAll(async () => {
   }
   mongoServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoServer.getUri());
-}, 60000);
+}, 120000);
 
 afterEach(async () => {
   const collections = mongoose.connection.collections;

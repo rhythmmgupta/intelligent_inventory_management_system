@@ -317,7 +317,7 @@ async function generateWasteRecommendations(productsWithStock, predictionsById =
           type: 'REDUCE_ORDER_QUANTITY',
           priority: wasteRatio >= 0.25 ? 'high' : 'medium',
           title: `Reduce reorder quantity (${item.reorderQuantity} -> ${reducedOrder} ${item.unit})`,
-          action: `${Math.round(wasteRatio * 100)}% of recent volume was wasted ($${wasteStats.totalLoss.toFixed(2)} loss). Switch to smaller, more frequent deliveries aligned to shelf life (${item.shelfLifeDays || 14}d).`,
+          action: `${Math.round(wasteRatio * 100)}% of recent volume was wasted (₹${wasteStats.totalLoss.toFixed(2)} loss). Switch to smaller, more frequent deliveries aligned to shelf life (${item.shelfLifeDays || 14}d).`,
           potentialSavingsOrLoss: Number(wasteStats.totalLoss.toFixed(2)),
           source: 'rule_based',
         });

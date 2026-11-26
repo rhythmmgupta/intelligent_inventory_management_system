@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts';
 import { apiRequest } from '../api/client';
+import { formatINR } from '../utils/currency';
 
 export default function WastePage() {
   const [periodDays, setPeriodDays] = useState(30);
@@ -76,7 +77,7 @@ export default function WastePage() {
             <div className="card">
               <div className="kpi-label">Estimated Financial Loss</div>
               <div className="kpi-value" style={{ color: '#dc2626' }}>
-                ${analytics.summary.totalLossAmount.toFixed(2)}
+                {formatINR(analytics.summary.totalLossAmount)}
               </div>
               <div className="kpi-meta">Based on batch cost price</div>
             </div>
@@ -86,7 +87,7 @@ export default function WastePage() {
                 {analytics.byCategory[0]?.category || 'None'}
               </div>
               <div className="kpi-meta">
-                ${(analytics.byCategory[0]?.totalLossAmount || 0).toFixed(2)} loss
+                {formatINR(analytics.byCategory[0]?.totalLossAmount || 0)} loss
               </div>
             </div>
             <div className="card">
@@ -95,14 +96,14 @@ export default function WastePage() {
                 {analytics.bySupplier[0]?.supplier || 'None'}
               </div>
               <div className="kpi-meta">
-                ${(analytics.bySupplier[0]?.totalLossAmount || 0).toFixed(2)} loss
+                {formatINR(analytics.bySupplier[0]?.totalLossAmount || 0)} loss
               </div>
             </div>
           </div>
 
           <div className="grid-2">
             <div className="card">
-              <h3 className="section-title">Waste Loss by Category ($)</h3>
+              <h3 className="section-title">Waste Loss by Category (₹)</h3>
               <div style={{ width: '100%', height: 240 }}>
                 <ResponsiveContainer>
                   <BarChart data={analytics.byCategory}>
@@ -110,14 +111,14 @@ export default function WastePage() {
                     <XAxis dataKey="category" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="totalLossAmount" name="Cost Loss ($)" fill="#dc2626" />
+                    <Bar dataKey="totalLossAmount" name="Cost Loss (₹)" fill="#dc2626" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             <div className="card">
-              <h3 className="section-title">Waste Loss by Supplier ($)</h3>
+              <h3 className="section-title">Waste Loss by Supplier (₹)</h3>
               <div style={{ width: '100%', height: 240 }}>
                 <ResponsiveContainer>
                   <BarChart data={analytics.bySupplier}>
@@ -125,7 +126,7 @@ export default function WastePage() {
                     <XAxis dataKey="supplier" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="totalLossAmount" name="Cost Loss ($)" fill="#ea580c" />
+                    <Bar dataKey="totalLossAmount" name="Cost Loss (₹)" fill="#ea580c" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -175,7 +176,7 @@ export default function WastePage() {
                   <th>Product</th>
                   <th>Incidents</th>
                   <th>Qty Wasted</th>
-                  <th>Loss ($)</th>
+                  <th>Loss (₹)</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,7 +191,7 @@ export default function WastePage() {
                       {item.totalQuantity} {item.unit}
                     </td>
                     <td style={{ color: '#dc2626', fontWeight: 600 }}>
-                      ${item.totalLossAmount.toFixed(2)}
+                      {formatINR(item.totalLossAmount)}
                     </td>
                   </tr>
                 ))}
@@ -212,7 +213,7 @@ export default function WastePage() {
                 <th>Supplier</th>
                 <th>Qty</th>
                 <th>Reason</th>
-                <th>Loss ($)</th>
+                <th>Loss (₹)</th>
               </tr>
             </thead>
             <tbody>
@@ -226,7 +227,7 @@ export default function WastePage() {
                   <td>
                     <span className="badge badge-red">{l.reason}</span>
                   </td>
-                  <td>${l.estimatedLossAmount.toFixed(2)}</td>
+                  <td>{formatINR(l.estimatedLossAmount)}</td>
                 </tr>
               ))}
             </tbody>

@@ -80,12 +80,18 @@ describe('FreshGuard UI Components', () => {
       modelSummary: { selectedDemandAlgorithm: 'RandomForestRegressor' },
     });
 
-    render(<DashboardPage />);
-    expect(await screen.findByText('Store Operations Dashboard')).toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Store Overview')).toBeInTheDocument();
     expect(screen.getByText('450')).toBeInTheDocument();
     expect(screen.getByText('50')).toBeInTheDocument();
     expect(screen.getByText('Organic Whole Milk 1L')).toBeInTheDocument();
-    expect(screen.getByText('$84.50')).toBeInTheDocument();
+    expect(screen.getByText('₹84.50')).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Waste Actions/i));
+    expect(screen.getByText('Greek Yogurt 500g')).toBeInTheDocument();
   });
 
   test('renders Inventory explorer with expandable FEFO batch rows', async () => {
