@@ -36,10 +36,10 @@ def test_train_and_predict_with_expiry_simulation_and_cold_start():
             "products": [
                 {
                     **synthetic[0],
-                    "active_usable_quantity": 40.0,
+                    "active_usable_quantity": 120.0,
                     "batches": [
                         {
-                            "remaining_quantity": 40.0,
+                            "remaining_quantity": 120.0,
                             "expiry_date": (today + timedelta(days=1)).isoformat(),
                         }
                     ],
@@ -85,7 +85,7 @@ def test_train_and_predict_with_expiry_simulation_and_cold_start():
         ml_pred = preds[0]
         assert ml_pred["prediction_source"] == "ml_model"
         assert len(ml_pred["forecast_horizon"]) == 7
-        # 40 units expire after day 1, so stockout happens around day 3 despite 40 units on shelf!
+        # 120 units expire after day 1, so ~80 units spoil and stockout happens on day 3!
         assert ml_pred["predicted_stockout_days"] is not None
         assert ml_pred["predicted_stockout_days"] <= 4
         assert ml_pred["projected_spoilage_units"] > 0
